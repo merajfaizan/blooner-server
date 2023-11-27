@@ -19,16 +19,32 @@ const client = new MongoClient(uri, {
   },
 });
 
+// api routes
 async function run() {
   try {
     // await client.connect();
+    const userCollection = client.db("bloonerDB").collection("users");
+
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      // insert email if user doesn't exists for making email unique
+      const query = { email: user.email };
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        return res.send({
+          message: "user already exists with this email, try different email",
+          insertedId: null,
+        });
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
-
-    // api routes
   } finally {
     // await client.close(console.log("database is closed"));
   }
