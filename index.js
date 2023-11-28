@@ -25,6 +25,9 @@ async function run() {
   try {
     // await client.connect();
     const userCollection = client.db("bloonerDB").collection("users");
+    const donationRequestCollection = client
+      .db("bloonerDB")
+      .collection("donationRequest");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -52,7 +55,6 @@ async function run() {
 
     // use verify admin after verifyToken
     const verifyAdmin = async (req, res, next) => {
-      console.log(req.decoded);
       const email = req.decoded.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
@@ -85,6 +87,11 @@ async function run() {
       res.send({ user });
     });
 
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+
     app.put("/users", verifyToken, async (req, res) => {
       const userData = req.body;
       const email = req.decoded.email;
@@ -107,6 +114,16 @@ async function run() {
         });
       }
       const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    // donation related routes
+    app.post("/donationRequests", verifyToken, async (req, res) => {
+      const donationRequestData = req.body;
+
+      const result = await donationRequestCollection.insertOne(
+        donationRequestData
+      );
       res.send(result);
     });
 
