@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const jwt = require('jsonwebtoken');
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
@@ -37,7 +37,6 @@ async function run() {
 
     // middlewares
     const verifyToken = (req, res, next) => {
-      console.log("inside verify token", req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: "unauthorized access" });
       }
@@ -51,7 +50,31 @@ async function run() {
       });
     };
 
-    
+    // use verify admin after verifyToken
+    const verifyAdmin = async (req, res, next) => {
+      console.log(req.decoded);
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
+    // use verify admin after verifyToken
+    const verifyAdminOrVolunteer = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      const isVolunteer = user?.role === "volunteer";
+      if (!isAdmin || !isVolunteer) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
 
     // users related routes
     app.get("/users/:email", async (req, res) => {
@@ -59,7 +82,17 @@ async function run() {
       const query = { email: email };
 
       const user = await userCollection.findOne(query);
-      res.send({user});
+      res.send({ user });
+    });
+
+    app.put("/users", verifyToken, async (req, res) => {
+      const userData = req.body;
+      const email = req.decoded.email;
+      const query = { email: email };
+
+      const result = await userCollection.updateOne(query, { $set: userData });
+      console.log(result);
+      res.send(result);
     });
 
     app.post("/users", async (req, res) => {
