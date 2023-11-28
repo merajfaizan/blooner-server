@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const jwt = require('jsonwebtoken');
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
@@ -25,6 +26,42 @@ async function run() {
     // await client.connect();
     const userCollection = client.db("bloonerDB").collection("users");
 
+    // jwt related api
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
+    // middlewares
+    const verifyToken = (req, res, next) => {
+      console.log("inside verify token", req.headers.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "unauthorized access" });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
+
+    
+
+    // users related routes
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+
+      const user = await userCollection.findOne(query);
+      res.send({user});
+    });
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       // insert email if user doesn't exists for making email unique
@@ -41,10 +78,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // await client.close(console.log("database is closed"));
   }
