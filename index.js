@@ -195,11 +195,34 @@ async function run() {
     });
 
     // donation related routes
-    // save donation request
-    app.get("/donationRequests", verifyToken, verifyAdmin, async (req, res) => {
-      const result = await donationRequestCollection.find({}).toArray();
-      res.send(result);
+    // get donation request detail of logged in user and limit upto 3 data
+    app.get("/donation-requests", verifyToken, async (req, res) => {
+      const userEmail = req.decoded.email;
+      const { limit } = req.query;
+
+      try {
+        const donationRequests = await donationRequestCollection
+          .find({ requesterEmail: userEmail })
+          .limit(Number(limit))
+          .toArray();
+
+        res.send(donationRequests);
+      } catch (error) {
+        console.error("Error fetching donation requests:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+      }
     });
+
+    // get all donation request (admin and volunteer only)
+    app.get(
+      "/admin/donationRequests",
+      verifyToken,
+      verifyAdminOrVolunteer,
+      async (req, res) => {
+        const result = await donationRequestCollection.find({}).toArray();
+        res.send(result);
+      }
+    );
 
     // save donation request
     app.post("/donationRequests", verifyToken, async (req, res) => {
@@ -278,12 +301,17 @@ async function run() {
     });
 
     // add a new blog to db
-    app.post("/blogs", verifyToken, verifyAdminOrVolunteer, async (req, res) => {
-      const blog = req.body;
+    app.post(
+      "/blogs",
+      verifyToken,
+      verifyAdminOrVolunteer,
+      async (req, res) => {
+        const blog = req.body;
 
-      const result = await blogCollection.insertOne(blog);
-      res.send(result);
-    });
+        const result = await blogCollection.insertOne(blog);
+        res.send(result);
+      }
+    );
 
     // update blog status to draft or publish
     app.put("/blogs/:blogId", verifyToken, verifyAdmin, async (req, res) => {
