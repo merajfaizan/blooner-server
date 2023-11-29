@@ -184,6 +184,21 @@ async function run() {
     });
 
     //blog related routes
+    // get all blogs
+    app.get("/blogs/all", async (req, res) => {
+      const result = await blogCollection.find({}).toArray();
+      res.send(result);
+    });
+
+    // get blog by id
+    app.get("/blogs/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      const result = await blogCollection.findOne(query);
+      res.send(result);
+    });
+
     // get blogs by default all or via query draft or publish
     app.get("/blogs", verifyToken, verifyAdmin, async (req, res) => {
       let query = {};
@@ -226,6 +241,16 @@ async function run() {
 
         res.status(200).send(result);
       }
+    });
+
+    // delete blog by id
+    app.delete("/blogs/:blogId", async (req, res) => {
+      const { blogId } = req.params;
+
+      const result = await blogCollection.deleteOne({
+        _id: new ObjectId(blogId),
+      });
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
