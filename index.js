@@ -79,6 +79,7 @@ async function run() {
     };
 
     // users related routes
+    // get user information via email
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
@@ -87,11 +88,27 @@ async function run() {
       res.send({ user });
     });
 
+    // get all user information admin , volunteer , donors
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
 
+    // get all donors information
+    app.get("/donors", async (req, res) => {
+      const query = { role: "donor" };
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // get filterd donors information
+    app.post("/find-donors", async (req, res) => {
+      const query = req.body;
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // update the user info after token verify
     app.put("/users", verifyToken, async (req, res) => {
       const userData = req.body;
       const email = req.decoded.email;
@@ -102,9 +119,9 @@ async function run() {
       res.send(result);
     });
 
+    // create user in the database after checking is user already exists or not
     app.post("/users", async (req, res) => {
       const user = req.body;
-      // insert email if user doesn't exists for making email unique
       const query = { email: user.email };
       const existingUser = await userCollection.findOne(query);
       if (existingUser) {
@@ -124,6 +141,37 @@ async function run() {
       const result = await donationRequestCollection.insertOne(
         donationRequestData
       );
+      res.send(result);
+    });
+
+    // get donation request details by id
+    app.get("/donationRequests/:id", verifyToken, async (req, res) => {
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
+
+      const result = await donationRequestCollection.findOne(query);
+      res.send(result);
+    });
+
+    // update donation request details by id
+    app.put("/donationRequests/:id", verifyToken, async (req, res) => {
+      const updatedData = req.body;
+      const { id } = req.params;
+      const query = { _id: new ObjectId(id) };
+
+      const requestData = await donationRequestCollection.findOne(query);
+      requestData.status = "inprogress";
+      const newData = { ...updatedData, status: requestData.status };
+      const result = await donationRequestCollection.updateOne(query, {
+        $set: newData,
+      });
+      res.send(result);
+    });
+
+    // get all pending donation requests
+    app.get("/pending-requests", async (req, res) => {
+      const query = { status: "pending" };
+      const result = await donationRequestCollection.find(query).toArray();
       res.send(result);
     });
 
