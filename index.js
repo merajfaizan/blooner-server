@@ -91,9 +91,68 @@ async function run() {
 
     // get all user information admin , volunteer , donors
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
-      const result = await userCollection.find().toArray();
-      res.send(result);
+      const { options, page = 1, pageSize = 5 } = req.query;
+      let query = {}; // Default: All
+      const skip = (parseInt(page) - 1) * parseInt(pageSize);
+
+      if (options === "active") {
+        query = { status: "active" };
+      } else if (options === "blocked") {
+        query = { status: "blocked" };
+      }
+
+      const result = await userCollection
+        .find(query)
+        .skip(skip)
+        .limit(Number(pageSize))
+        .toArray();
+
+      const totalCount = await userCollection.countDocuments(query);
+
+      res.send({ data: result, totalCount });
     });
+
+    // make the user block or unblock
+    app.put(
+      "/users/:id/toggle-status",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const userId = req.params.id;
+        const user = await userCollection.findOne({
+          _id: new ObjectId(userId),
+        });
+        const newStatus = user.status === "active" ? "blocked" : "active";
+
+        const result = await userCollection.updateOne(
+          { _id: new ObjectId(userId) },
+          { $set: { status: newStatus } }
+        );
+
+        res.send(result);
+      }
+    );
+
+    // give the user role
+    app.put(
+      "/users/:id/toggle-role",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const userId = req.params.id;
+        const { newRole } = req.body;
+        const user = await userCollection.findOne({
+          _id: new ObjectId(userId),
+        });
+
+        const result = await userCollection.updateOne(
+          { _id: new ObjectId(userId) },
+          { $set: { role: newRole } }
+        );
+
+        res.send(result);
+      }
+    );
 
     // get all donors information
     app.get("/donors", async (req, res) => {
@@ -184,13 +243,13 @@ async function run() {
     });
 
     //blog related routes
-    // get all blogs
+    // get all blogs ( public )
     app.get("/blogs/all", async (req, res) => {
       const result = await blogCollection.find({}).toArray();
       res.send(result);
     });
 
-    // get blog by id
+    // get blog by id ( public )
     app.get("/blogs/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -200,7 +259,7 @@ async function run() {
     });
 
     // get blogs by default all or via query draft or publish
-    app.get("/blogs", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/blogs", verifyToken, verifyAdminOrVolunteer, async (req, res) => {
       let query = {};
       // Check the selected option and modify the query accordingly
       switch (req.query.option) {
@@ -219,7 +278,7 @@ async function run() {
     });
 
     // add a new blog to db
-    app.post("/blogs", verifyToken, verifyAdmin, async (req, res) => {
+    app.post("/blogs", verifyToken, verifyAdminOrVolunteer, async (req, res) => {
       const blog = req.body;
 
       const result = await blogCollection.insertOne(blog);
