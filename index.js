@@ -25,6 +25,7 @@ async function run() {
   try {
     // await client.connect();
     const userCollection = client.db("bloonerDB").collection("users");
+    const blogCollection = client.db("bloonerDB").collection("blogs");
     const donationRequestCollection = client
       .db("bloonerDB")
       .collection("donationRequest");
@@ -135,6 +136,13 @@ async function run() {
     });
 
     // donation related routes
+    // save donation request
+    app.get("/donationRequests", verifyToken, verifyAdmin, async (req, res) => {
+      const result = await donationRequestCollection.find({}).toArray();
+      res.send(result);
+    });
+
+    // save donation request
     app.post("/donationRequests", verifyToken, async (req, res) => {
       const donationRequestData = req.body;
 
@@ -173,6 +181,51 @@ async function run() {
       const query = { status: "pending" };
       const result = await donationRequestCollection.find(query).toArray();
       res.send(result);
+    });
+
+    //blog related routes
+    // get blogs by default all or via query draft or publish
+    app.get("/blogs", verifyToken, verifyAdmin, async (req, res) => {
+      let query = {};
+      // Check the selected option and modify the query accordingly
+      switch (req.query.option) {
+        case "draft":
+          query = { status: "draft" };
+          break;
+        case "published":
+          query = { status: "published" };
+          break;
+        default:
+          break;
+      }
+
+      const result = await blogCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // add a new blog to db
+    app.post("/blogs", verifyToken, verifyAdmin, async (req, res) => {
+      const blog = req.body;
+
+      const result = await blogCollection.insertOne(blog);
+      res.send(result);
+    });
+
+    // update blog status to draft or publish
+    app.put("/blogs/:blogId", verifyToken, verifyAdmin, async (req, res) => {
+      const { blogId } = req.params;
+      const { action } = req.body;
+
+      if (action === "publish" || action === "draft") {
+        const newStatus = action === "publish" ? "published" : "draft";
+
+        const result = await blogCollection.updateOne(
+          { _id: new ObjectId(blogId) },
+          { $set: { status: newStatus } }
+        );
+
+        res.status(200).send(result);
+      }
     });
 
     // Send a ping to confirm a successful connection
