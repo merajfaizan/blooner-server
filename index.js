@@ -71,9 +71,9 @@ async function run() {
       const email = req.decoded.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
-      const isAdmin = user?.role === "admin";
-      const isVolunteer = user?.role === "volunteer";
-      if (!isAdmin || !isVolunteer) {
+      const isAdminOrVolunteer =
+        user?.role === "admin" || user?.role === "volunteer";
+      if (!isAdminOrVolunteer) {
         return res.status(403).send({ message: "forbidden access" });
       }
       next();
@@ -198,15 +198,29 @@ async function run() {
     // get donation request detail of logged in user and limit upto 3 data
     app.get("/donation-requests", verifyToken, async (req, res) => {
       const userEmail = req.decoded.email;
-      const { limit } = req.query;
+      const { limit = 5, page = 1, status = "all" } = req.query;
 
       try {
+        const query =
+          status === "all"
+            ? { requesterEmail: userEmail }
+            : { requesterEmail: userEmail, status };
+
+        // Get total count of donation requests
+        const totalCount = await donationRequestCollection.countDocuments(
+          query
+        );
+
+        // calculate pagination
+        const skip = (page - 1) * Number(limit);
+
         const donationRequests = await donationRequestCollection
-          .find({ requesterEmail: userEmail })
+          .find(query)
+          .skip(skip)
           .limit(Number(limit))
           .toArray();
 
-        res.send(donationRequests);
+        res.send({ totalCount, donationRequests });
       } catch (error) {
         console.error("Error fetching donation requests:", error);
         res.status(500).json({ message: "Internal Server Error" });
@@ -215,12 +229,37 @@ async function run() {
 
     // get all donation request (admin and volunteer only)
     app.get(
-      "/admin/donationRequests",
+      "/admin/donation-requests",
       verifyToken,
       verifyAdminOrVolunteer,
       async (req, res) => {
-        const result = await donationRequestCollection.find({}).toArray();
-        res.send(result);
+        const { limit = 5, page = 1, status = "all" } = req.query;
+
+        try {
+          let query = {};
+          if (status !== "all") {
+            query = { status };
+          }
+
+          // Get total count of donation requests
+          const totalCount = await donationRequestCollection.countDocuments(
+            query
+          );
+
+          // calculate pagination
+          const skip = (page - 1) * Number(limit);
+
+          const donationRequests = await donationRequestCollection
+            .find(query)
+            .skip(skip)
+            .limit(Number(limit))
+            .toArray();
+
+          res.send({ totalCount, donationRequests });
+        } catch (error) {
+          console.error("Error fetching donation requests:", error);
+          res.status(500).json({ message: "Internal Server Error" });
+        }
       }
     );
 
@@ -243,7 +282,7 @@ async function run() {
       res.send(result);
     });
 
-    // update donation request details by id
+    // update donation request details by id for donar assign
     app.put("/donationRequests/:id", verifyToken, async (req, res) => {
       const updatedData = req.body;
       const { id } = req.params;
@@ -256,6 +295,66 @@ async function run() {
         $set: newData,
       });
       res.send(result);
+    });
+
+    // change donation request status  pending to done , canceled
+    app.put(
+      "/donation-requests/:id/update-status",
+      verifyToken,
+      async (req, res) => {
+        const donationRequestId = req.params.id;
+        const { status } = req.body;
+
+        try {
+          const result = await donationRequestCollection.updateOne(
+            { _id: new ObjectId(donationRequestId) },
+            { $set: { status } }
+          );
+
+          res.send(result);
+        } catch (error) {
+          console.error("Error updating donation request status:", error);
+          res.status(500).json({ message: "Internal Server Error" });
+        }
+      }
+    );
+
+    // delete donation request
+    app.delete(
+      "/donation-requests/:id/delete",
+      verifyToken,
+      async (req, res) => {
+        const donationRequestId = req.params.id;
+
+        try {
+          // Delete the donation request
+          const result = await donationRequestCollection.deleteOne({
+            _id: new ObjectId(donationRequestId),
+          });
+
+          res.send(result);
+        } catch (error) {
+          console.error("Error deleting donation request:", error);
+          res.status(500).json({ message: "Internal Server Error" });
+        }
+      }
+    );
+
+    app.put("/donation-requests/:id/update", verifyToken, async (req, res) => {
+      const donationRequestId = req.params.id;
+      const updatedData = req.body;
+
+      try {
+        const result = await donationRequestCollection.updateOne(
+          { _id: new ObjectId(donationRequestId) },
+          { $set: updatedData }
+        );
+
+        res.json({ modifiedCount: result.modifiedCount });
+      } catch (error) {
+        console.error("Error updating donation request:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+      }
     });
 
     // get all pending donation requests
