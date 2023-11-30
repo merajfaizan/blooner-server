@@ -66,18 +66,6 @@ async function run() {
       next();
     };
 
-    // use verify volunteer after verifyToken
-    const verifyVolunteer = async (req, res, next) => {
-      const email = req.decoded.email;
-      const query = { email: email };
-      const user = await userCollection.findOne(query);
-      const isVolunteer = user?.role === "volunteer";
-      if (!isVolunteer) {
-        return res.status(403).send({ message: "forbidden access" });
-      }
-      next();
-    };
-
     // use verify admin after verifyToken
     const verifyAdminOrVolunteer = async (req, res, next) => {
       const email = req.decoded.email;
@@ -102,7 +90,7 @@ async function run() {
     });
 
     // get all user information admin , volunteer , donors
-    app.get("/users", verifyToken, verifyAdminOrVolunteer, async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const { options, page = 1, pageSize = 5 } = req.query;
       let query = {}; // Default: All
       const skip = (parseInt(page) - 1) * parseInt(pageSize);
