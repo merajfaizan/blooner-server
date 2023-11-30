@@ -155,15 +155,34 @@ async function run() {
     );
 
     // get all donors information
-    app.get("/donors", async (req, res) => {
-      const query = { role: "donor" };
-      const result = await userCollection.find(query).toArray();
-      res.send(result);
+    app.get("/find-donors", async (req, res) => {
+      try {
+        const { bloodGroup, district, upazila } = req.query;
+        let query = { role: "donor" };
+
+        if (bloodGroup) {
+          query = { ...query, bloodGroup };
+        }
+
+        if (district) {
+          query = { ...query, district };
+        }
+
+        if (upazila) {
+          query = { ...query, upazila };
+        }
+
+        const result = await userCollection.find(query).toArray();
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching donors:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+      }
     });
 
-    // get filterd donors information
-    app.post("/find-donors", async (req, res) => {
-      const query = req.body;
+    // get all donors information
+    app.get("/donors", async (req, res) => {
+      const query = { role: "donor" };
       const result = await userCollection.find(query).toArray();
       res.send(result);
     });
@@ -226,6 +245,22 @@ async function run() {
         res.status(500).json({ message: "Internal Server Error" });
       }
     });
+
+    app.get(
+      "/donation-request-count",
+      verifyToken,
+      verifyAdminOrVolunteer,
+      async (req, res) => {
+        try {
+          const totalCount = await donationRequestCollection.countDocuments();
+
+          res.json({ totalCount });
+        } catch (error) {
+          console.error("Error fetching donation request count:", error);
+          res.status(500).json({ message: "Internal Server Error" });
+        }
+      }
+    );
 
     // get all donation request (admin and volunteer only)
     app.get(
