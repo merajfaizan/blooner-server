@@ -90,7 +90,7 @@ async function run() {
     });
 
     // get all user information admin , volunteer , donors
-    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/users", verifyToken, verifyAdminOrVolunteer, async (req, res) => {
       const { options, page = 1, pageSize = 5 } = req.query;
       let query = {}; // Default: All
       const skip = (parseInt(page) - 1) * parseInt(pageSize);
